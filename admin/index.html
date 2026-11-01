@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Painel — Administração TechVanguard</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <nav class="subnav" id="subnav" aria-label="Administração"></nav>
+    <h1>Painel de administração</h1>
+    <p class="intro">Resumo da operação. Use o menu acima para gerir serviços, clientes, pedidos e acessos.</p>
+    <div class="numeros" id="numeros"><div class="numero"><strong>…</strong><span>Carregando</span></div></div>
+  </main>
+
+  <script type="module">
+    import { db, collection, query, where, getCountFromServer } from "/js/firebase.js";
+    import { exigirAdmin } from "/js/sessao.js";
+    import { montarCabecalho, montarSubnavAdmin, toast } from "/js/ui.js";
+
+    const sessao = await exigirAdmin();
+    montarCabecalho(sessao, "admin");
+    montarSubnavAdmin("painel");
+
+    const contar = async (q) => (await getCountFromServer(q)).data().count;
+    try {
+      const [servicos, clientes, pendentes, pedidos, acessos] = await Promise.all([
+        contar(collection(db, "servicos")),
+        contar(query(collection(db, "usuarios"), where("papel", "==", "cliente"))),
+        contar(query(collection(db, "pedidos"), where("status", "==", "pendente"))),
+        contar(collection(db, "pedidos")),
+        contar(collection(db, "acessos"))
+      ]);
+      const itens = [
+        [servicos, "serviços cadastrados"],
+        [clientes, "clientes"],
+        [pedidos, "pedidos de orçamento"],
+        [pendentes, "pedidos pendentes"],
+        [acessos, "acessos registados"]
+      ];
+      document.getElementById("numeros").innerHTML =
+        itens.map(([n, t]) => `<div class="numero"><strong>${n}</strong><span>${t}</span></div>`).join("");
+    } catch (e) {
+      console.error(e);
+      toast("Não foi possível carregar os números.", true);
+    }
+  </script>
+</body>
+</html>

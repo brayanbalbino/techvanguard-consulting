@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Clientes — Administração TechVanguard</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <nav class="subnav" id="subnav" aria-label="Administração"></nav>
+    <h1>Clientes</h1>
+    <p class="intro">Contas criadas na área do cliente.</p>
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr><th>Nome</th><th>E-mail</th><th>Cadastro</th></tr></thead>
+        <tbody id="corpo"><tr><td colspan="3">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, query, where } from "/js/firebase.js";
+    import { exigirAdmin } from "/js/sessao.js";
+    import { montarCabecalho, montarSubnavAdmin, esc, fmtData } from "/js/ui.js";
+
+    const sessao = await exigirAdmin();
+    montarCabecalho(sessao, "admin");
+    montarSubnavAdmin("clientes");
+
+    const corpo = document.getElementById("corpo");
+    try {
+      const snap = await getDocs(query(collection(db, "usuarios"), where("papel", "==", "cliente")));
+      const clientes = snap.docs.map((d) => d.data())
+        .sort((a, b) => (b.criadoEm?.seconds ?? 0) - (a.criadoEm?.seconds ?? 0));
+      corpo.innerHTML = clientes.length
+        ? clientes.map((c) => `<tr><td>${esc(c.nome)}</td><td>${esc(c.email)}</td><td>${fmtData(c.criadoEm)}</td></tr>`).join("")
+        : '<tr><td colspan="3" class="vazio">Ainda não há clientes cadastrados.</td></tr>';
+    } catch (e) {
+      console.error(e);
+      corpo.innerHTML = '<tr><td colspan="3">Não foi possível carregar os clientes.</td></tr>';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Acessos — Administração TechVanguard</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <nav class="subnav" id="subnav" aria-label="Administração"></nav>
+    <h1>Registo de acessos</h1>
+    <p class="intro">Os 200 acessos mais recentes, com data e hora. O logout só é registado quando a pessoa clica em “Sair”.</p>
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr><th>Data e hora</th><th>E-mail</th><th>Ação</th></tr></thead>
+        <tbody id="corpo"><tr><td colspan="3">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, query, orderBy, limit } from "/js/firebase.js";
+    import { exigirAdmin } from "/js/sessao.js";
+    import { montarCabecalho, montarSubnavAdmin, esc, fmtData } from "/js/ui.js";
+
+    const sessao = await exigirAdmin();
+    montarCabecalho(sessao, "admin");
+    montarSubnavAdmin("acessos");
+
+    const ROTULO = { login: "Início de sessão", logout: "Encerramento de sessão", registo: "Criação de conta" };
+    const corpo = document.getElementById("corpo");
+    try {
+      const snap = await getDocs(query(collection(db, "acessos"), orderBy("dataHora", "desc"), limit(200)));
+      corpo.innerHTML = snap.empty
+        ? '<tr><td colspan="3" class="vazio">Nenhum acesso registado ainda.</td></tr>'
+        : snap.docs.map((d) => d.data()).map((a) =>
+            `<tr><td>${fmtData(a.dataHora)}</td><td>${esc(a.email)}</td><td>${esc(ROTULO[a.acao] || a.acao)}</td></tr>`).join("");
+    } catch (e) {
+      console.error(e);
+      corpo.innerHTML = '<tr><td colspan="3">Não foi possível carregar os acessos.</td></tr>';
+    }
+  </script>
+</body>
+</html>

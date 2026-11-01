@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar — TechVanguard Consulting</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="auth-wrap">
+    <h1>Entrar</h1>
+    <p>Acesse a sua área para consultar serviços e acompanhar pedidos de orçamento.</p>
+    <div class="msg msg-erro" id="erro" role="alert" hidden></div>
+    <form id="form-login" novalidate>
+      <div class="campo">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" autocomplete="email" required>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" autocomplete="current-password" required>
+      </div>
+      <button class="btn btn-rota" type="submit" id="enviar">Entrar</button>
+    </form>
+    <p style="margin-top:20px">Ainda não tem conta? <a href="/registo.html">Criar conta</a></p>
+  </main>
+
+  <script type="module">
+    import { auth, signInWithEmailAndPassword } from "/js/firebase.js";
+    import { aguardarUsuario, registarAcesso } from "/js/sessao.js";
+    import { montarCabecalho, mensagemErroAuth } from "/js/ui.js";
+
+    const sessao = await aguardarUsuario();
+    montarCabecalho({ user: null, perfil: null });
+
+    // Evita redirecionamento para sites externos: só aceita caminhos internos.
+    function destinoSeguro() {
+      const next = new URLSearchParams(location.search).get("next");
+      return next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+    }
+
+    function irParaArea(perfil) {
+      location.href = destinoSeguro() || (perfil?.papel === "admin" ? "/admin" : "/cliente/servicos.html");
+    }
+
+    if (sessao.user) irParaArea(sessao.perfil);
+
+    const erro = document.getElementById("erro");
+    const botao = document.getElementById("enviar");
+
+    document.getElementById("form-login").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      erro.hidden = true;
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+      if (!email || !senha) {
+        erro.textContent = "Preencha o e-mail e a senha.";
+        erro.hidden = false;
+        return;
+      }
+      botao.disabled = true;
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email, senha);
+        try { await registarAcesso(cred.user, "login"); } catch (e) { console.warn("Falha ao registar acesso:", e); }
+        const { perfil } = await aguardarUsuario();
+        irParaArea(perfil);
+      } catch (e) {
+        erro.textContent = mensagemErroAuth(e.code);
+        erro.hidden = false;
+        botao.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

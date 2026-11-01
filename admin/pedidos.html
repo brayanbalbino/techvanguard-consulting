@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Pedidos — Administração TechVanguard</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <nav class="subnav" id="subnav" aria-label="Administração"></nav>
+    <h1>Pedidos de orçamento</h1>
+    <p class="intro">Altere o estado de um pedido na própria tabela.</p>
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Cliente</th><th>Serviço</th><th>Descrição</th><th>Prazo</th><th>Estado</th></tr></thead>
+        <tbody id="corpo"><tr><td colspan="6">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, updateDoc, doc } from "/js/firebase.js";
+    import { exigirAdmin } from "/js/sessao.js";
+    import { montarCabecalho, montarSubnavAdmin, esc, fmtData, toast, ESTADOS } from "/js/ui.js";
+
+    const sessao = await exigirAdmin();
+    montarCabecalho(sessao, "admin");
+    montarSubnavAdmin("pedidos");
+
+    const corpo = document.getElementById("corpo");
+    try {
+      const snap = await getDocs(collection(db, "pedidos"));
+      const pedidos = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (b.criadoEm?.seconds ?? 0) - (a.criadoEm?.seconds ?? 0));
+      corpo.innerHTML = pedidos.length
+        ? pedidos.map((p) => `
+            <tr>
+              <td>${fmtData(p.criadoEm)}</td>
+              <td>${esc(p.clienteNome)}<br><span class="ajuda">${esc(p.clienteEmail)}</span></td>
+              <td>${esc(p.servicoNome)}</td>
+              <td>${esc(p.descricao)}</td>
+              <td>${esc(p.prazo || "—")}</td>
+              <td>
+                <select data-id="${esc(p.id)}" aria-label="Estado do pedido">
+                  ${Object.entries(ESTADOS).map(([k, v]) => `<option value="${k}"${k === p.status ? " selected" : ""}>${v}</option>`).join("")}
+                </select>
+              </td>
+            </tr>`).join("")
+        : '<tr><td colspan="6" class="vazio">Ainda não há pedidos de orçamento.</td></tr>';
+    } catch (e) {
+      console.error(e);
+      corpo.innerHTML = '<tr><td colspan="6">Não foi possível carregar os pedidos.</td></tr>';
+    }
+
+    corpo.addEventListener("change", async (ev) => {
+      const sel = ev.target.closest("select[data-id]");
+      if (!sel) return;
+      try {
+        await updateDoc(doc(db, "pedidos", sel.dataset.id), { status: sel.value });
+        toast("Estado atualizado.");
+      } catch (e) {
+        console.error(e);
+        toast("Não foi possível atualizar o estado.", true);
+      }
+    });
+  </script>
+</body>
+</html>

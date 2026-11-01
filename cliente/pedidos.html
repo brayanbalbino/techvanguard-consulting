@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meus pedidos — TechVanguard Consulting</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <h1>Pedidos de orçamento</h1>
+
+    <section class="painel" aria-labelledby="titulo-form">
+      <h2 id="titulo-form">Novo pedido</h2>
+      <div class="msg msg-erro" id="erro" role="alert" hidden></div>
+      <div class="msg msg-ok" id="ok" role="status" hidden></div>
+      <form id="form-pedido" novalidate>
+        <div class="campo">
+          <label for="servico">Serviço</label>
+          <select id="servico" required><option value="">Carregando…</option></select>
+        </div>
+        <div class="campo">
+          <label for="descricao">O que você precisa?</label>
+          <textarea id="descricao" maxlength="2000" required></textarea>
+          <p class="ajuda">Descreva o objetivo, o contexto e qualquer restrição. Mínimo de 10 caracteres.</p>
+        </div>
+        <div class="campo">
+          <label for="prazo">Prazo desejado (opcional)</label>
+          <input type="date" id="prazo">
+        </div>
+        <button class="btn btn-rota" type="submit" id="enviar">Enviar pedido</button>
+      </form>
+    </section>
+
+    <h2>Meus pedidos</h2>
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr><th>Data</th><th>Serviço</th><th>Descrição</th><th>Prazo</th><th>Estado</th></tr></thead>
+        <tbody id="corpo"><tr><td colspan="5">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, addDoc, query, where, serverTimestamp } from "/js/firebase.js";
+    import { exigirLogin } from "/js/sessao.js";
+    import { montarCabecalho, esc, fmtData, ESTADOS } from "/js/ui.js";
+
+    const sessao = await exigirLogin();
+    montarCabecalho(sessao, "pedidos");
+    const { user, perfil } = sessao;
+
+    const selServico = document.getElementById("servico");
+    const erro = document.getElementById("erro");
+    const ok = document.getElementById("ok");
+    const botao = document.getElementById("enviar");
+    let servicos = [];
+
+    async function carregarServicos() {
+      const snap = await getDocs(query(collection(db, "servicos"), where("ativo", "==", true)));
+      servicos = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      selServico.innerHTML = '<option value="">Selecione um serviço</option>' +
+        servicos.map((s) => `<option value="${esc(s.id)}">${esc(s.nome)}</option>`).join("");
+      const preSel = new URLSearchParams(location.search).get("servico");
+      if (preSel) selServico.value = preSel;
+    }
+
+    async function carregarPedidos() {
+      const corpo = document.getElementById("corpo");
+      try {
+        // Filtra pelo uid; a ordenação é feita no navegador para não exigir índice composto.
+        const snap = await getDocs(query(collection(db, "pedidos"), where("uid", "==", user.uid)));
+        const pedidos = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (b.criadoEm?.seconds ?? 0) - (a.criadoEm?.seconds ?? 0));
+        corpo.innerHTML = pedidos.length
+          ? pedidos.map((p) => `
+              <tr>
+                <td>${fmtData(p.criadoEm)}</td>
+                <td>${esc(p.servicoNome)}</td>
+                <td>${esc(p.descricao)}</td>
+                <td>${esc(p.prazo || "—")}</td>
+                <td><span class="selo selo-${esc(p.status)}">${esc(ESTADOS[p.status] || p.status)}</span></td>
+              </tr>`).join("")
+          : '<tr><td colspan="5" class="vazio">Você ainda não enviou pedidos. Use o formulário acima.</td></tr>';
+      } catch (e) {
+        console.error(e);
+        corpo.innerHTML = '<tr><td colspan="5">Não foi possível carregar os pedidos. Atualize a página.</td></tr>';
+      }
+    }
+
+    document.getElementById("form-pedido").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      erro.hidden = true; ok.hidden = true;
+      const servico = servicos.find((s) => s.id === selServico.value);
+      const descricao = document.getElementById("descricao").value.trim();
+      if (!servico) { erro.textContent = "Selecione um serviço."; erro.hidden = false; return; }
+      if (descricao.length < 10) { erro.textContent = "Descreva o pedido com pelo menos 10 caracteres."; erro.hidden = false; return; }
+
+      botao.disabled = true;
+      try {
+        await addDoc(collection(db, "pedidos"), {
+          uid: user.uid,
+          clienteNome: perfil?.nome || user.displayName || "",
+          clienteEmail: user.email,
+          servicoId: servico.id,
+          servicoNome: servico.nome,
+          descricao,
+          prazo: document.getElementById("prazo").value,
+          status: "pendente",
+          criadoEm: serverTimestamp()
+        });
+        ev.target.reset();
+        ok.textContent = "Pedido enviado. Você pode acompanhar o estado na tabela abaixo.";
+        ok.hidden = false;
+        await carregarPedidos();
+      } catch (e) {
+        console.error(e);
+        erro.textContent = "Não foi possível enviar o pedido. Tente novamente.";
+        erro.hidden = false;
+      } finally {
+        botao.disabled = false;
+      }
+    });
+
+    try { await carregarServicos(); } catch (e) { selServico.innerHTML = '<option value="">Erro ao carregar serviços</option>'; }
+    await carregarPedidos();
+  </script>
+</body>
+</html>

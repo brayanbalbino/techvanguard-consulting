@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autenticado() {
+      return request.auth != null;
+    }
+
+    // Admin = documento em /usuarios/{uid} com papel == 'admin'.
+    // Esse papel só pode ser definido manualmente no console do Firebase.
+    function ehAdmin() {
+      return autenticado()
+        && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+        && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.papel == 'admin';
+    }
+
+    // ---------- usuarios ----------
+    match /usuarios/{uid} {
+      allow read: if autenticado() && (request.auth.uid == uid || ehAdmin());
+
+      // O cadastro público só cria contas de cliente.
+      allow create: if autenticado()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nome', 'email', 'papel', 'criadoEm'])
+        && request.resource.data.papel == 'cliente'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.criadoEm == request.time;
+
+      // O próprio usuário não pode mudar o papel.
+      allow update: if autenticado()
+        && request.auth.uid == uid
+        && request.resource.data.papel == resource.data.papel;
+
+      allow delete: if false;
+    }
+
+    // ---------- servicos ----------
+    match /servicos/{id} {
+      allow read: if true;
+      allow create, update: if ehAdmin()
+        && request.resource.data.nome is string
+        && request.resource.data.nome.size() > 0
+        && request.resource.data.precoBase is number
+        && request.resource.data.ativo is bool;
+      allow delete: if ehAdmin();
+    }
+
+    // ---------- pedidos ----------
+    match /pedidos/{id} {
+      allow read: if autenticado() && (resource.data.uid == request.auth.uid || ehAdmin());
+
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'clienteNome', 'clienteEmail', 'servicoId', 'servicoNome',
+              'descricao', 'prazo', 'status', 'criadoEm'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pendente'
+        && request.resource.data.descricao is string
+        && request.resource.data.descricao.size() >= 10
+        && request.resource.data.descricao.size() <= 2000
+        && request.resource.data.criadoEm == request.time;
+
+      allow update, delete: if ehAdmin();
+    }
+
+    // ---------- acessos (log de login/logout) ----------
+    match /acessos/{id} {
+      allow read: if ehAdmin();
+
+      allow create: if autenticado()
+        && request.resource.data.keys().hasOnly(['uid', 'email', 'acao', 'dataHora'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.acao in ['login', 'logout', 'registo']
+        && request.resource.data.dataHora == request.time;
+
+      allow update, delete: if false;
+    }
+  }
+}

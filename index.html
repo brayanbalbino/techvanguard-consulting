@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TechVanguard Consulting — Transformação Digital e Soluções Tecnológicas sob Medida</title>
+  <meta name="description" content="Consultoria em tecnologia da informação: arquitetura e cloud, desenvolvimento web e mobile, cibersegurança e automação de processos.">
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <h1>Transformação Digital e Soluções Tecnológicas sob Medida</h1>
+          <p class="lead">A TechVanguard Consulting ajuda empresas a desenhar, construir e proteger os sistemas que sustentam o negócio.</p>
+          <div class="acoes">
+            <a class="btn btn-primario" href="/cliente/pedidos.html">Pedir um orçamento</a>
+            <a class="btn btn-contorno" href="#servicos">Ver serviços</a>
+          </div>
+        </div>
+        <svg class="hero-arte" viewBox="0 0 400 400" aria-hidden="true">
+          <path d="M40 380 L200 220 L360 380"/>
+          <path d="M40 300 L200 140 L360 300"/>
+          <path d="M40 220 L200 60 L360 220"/>
+          <path d="M40 140 L200 -20 L360 140"/>
+        </svg>
+      </div>
+    </section>
+
+    <section class="secao" id="servicos">
+      <div class="wrap">
+        <h2>Serviços</h2>
+        <p class="intro">Cada projeto começa por uma conversa. Crie uma conta, escolha o serviço e envie o seu pedido de orçamento.</p>
+        <ul class="lista-servicos" id="lista-servicos"></ul>
+      </div>
+    </section>
+
+    <section class="secao secao-clara" id="socios">
+      <div class="wrap">
+        <h2>Sócios</h2>
+        <p class="intro">As duas pessoas que lideram cada projeto.</p>
+        <!-- EDITAR: substituam os dados abaixo pelos da dupla (nome, cargo e currículo resumido). -->
+        <div class="socios">
+          <article class="socio">
+            <div class="monograma" aria-hidden="true">BB</div>
+            <div>
+              <h3>Brayan Balabino</h3>
+              <p class="cargo">CEO e Arquiteto de Soluções</p>
+            </div>
+            <div style="grid-column: 1 / -1">
+              <p>Profissional de tecnologia com formação em Ciências da Computação, focado em arquitetura de software, nuvem e desenvolvimento de aplicações web. Une visão técnica e de negócio para transformar processos manuais em sistemas simples de usar e fáceis de evoluir.</p>
+              <ul>
+                <li>Formação: Ciências da Computação, Unifanor Wyden</li>
+                <li>Experiência: fundador da BB Soluções Digitais, onde liderou o sistema de controle orçamentário e financeiro para pequenas obras (Python, Dash e Excel), que substituiu planilhas isoladas por um painel único de custos</li>
+                <li>Competências: arquitetura de software, cloud, back-end, front-end, Git e GitHub</li>
+              </ul>
+            </div>
+          </article>
+          <article class="socio">
+            <div class="monograma" aria-hidden="true">JT</div>
+            <div>
+              <h3>Jacqueline Tavares</h3>
+              <p class="cargo">CTO e Especialista em Desenvolvimento Front-End</p>
+            </div>
+            <div style="grid-column: 1 / -1">
+              <p>Desenvolvedora em formação na área de Tecnologia da Informação, com conhecimentos em desenvolvimento Full Stack e criação de aplicações web. Possui experiência prática em projetos acadêmicos e pessoais envolvendo desenvolvimento de interfaces, integração com APIs, gerenciamento de dados e aplicações responsivas. Atua com foco na construção de soluções tecnológicas funcionais, organização de código e aprimoramento contínuo de suas habilidades em desenvolvimento de software.</p>
+              <ul>
+                <li>Formação: Ciência da Computação, Unifanor (em andamento); Desenvolvimento Full Stack Java, EBAC (em andamento)</li>
+                <li>Projeto relevante: Sistema de Cadastro de Clientes, aplicação web com cadastro, consulta e exclusão de clientes, feita com HTML, CSS, JavaScript e integração com a API CrudCrud</li>
+                <li>Competências: HTML5, CSS3 e JavaScript; React e React Hooks; Next.js e TypeScript; interfaces responsivas; integração com APIs REST e manipulação de JSON; Node.js e MySQL (conhecimentos básicos); Git e GitHub; aplicações web e PWA</li>
+              </ul>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap"><strong>TechVanguard Consulting</strong> — Transformação Digital e Soluções Tecnológicas sob Medida</div>
+  </footer>
+
+  <script type="module">
+    import { db, collection, getDocs, query, where } from "/js/firebase.js";
+    import { aguardarUsuario } from "/js/sessao.js";
+    import { montarCabecalho, esc, fmtMoeda } from "/js/ui.js";
+    import { SERVICOS_PADRAO } from "/js/servicos-padrao.js";
+
+    montarCabecalho(await aguardarUsuario(), "inicio");
+
+    let servicos = SERVICOS_PADRAO;
+    try {
+      const snap = await getDocs(query(collection(db, "servicos"), where("ativo", "==", true)));
+      if (!snap.empty) {
+        servicos = snap.docs.map((d) => d.data()).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      }
+    } catch (e) {
+      console.warn("Usando a lista padrão de serviços:", e);
+    }
+
+    document.getElementById("lista-servicos").innerHTML = servicos.map((s) => `
+      <li>
+        <div><h3>${esc(s.nome)}</h3><p>${esc(s.descricao)}</p></div>
+        <p class="preco">a partir de <strong>${fmtMoeda(s.precoBase)}</strong></p>
+      </li>`).join("");
+  </script>
+</body>
+</html>

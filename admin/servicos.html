@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Serviços — Administração TechVanguard</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <nav class="subnav" id="subnav" aria-label="Administração"></nav>
+    <h1>Serviços</h1>
+
+    <section class="painel" aria-labelledby="titulo-form">
+      <h2 id="titulo-form">Novo serviço</h2>
+      <div class="msg msg-erro" id="erro" role="alert" hidden></div>
+      <form id="form-servico" novalidate>
+        <div class="campo">
+          <label for="nome">Nome</label>
+          <input type="text" id="nome" maxlength="120" required>
+        </div>
+        <div class="campo">
+          <label for="descricao">Descrição</label>
+          <textarea id="descricao" maxlength="500" required></textarea>
+        </div>
+        <div class="campo">
+          <label for="precoBase">Preço base (R$)</label>
+          <input type="number" id="precoBase" min="0" step="0.01" required>
+        </div>
+        <div class="campo">
+          <label class="check"><input type="checkbox" id="ativo" checked> Visível para os clientes</label>
+        </div>
+        <div class="barra-acoes">
+          <button class="btn btn-rota" type="submit" id="salvar">Salvar serviço</button>
+          <button class="btn btn-claro" type="button" id="cancelar" hidden>Cancelar edição</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="barra-acoes">
+      <button class="btn btn-claro" type="button" id="semear" hidden>Carregar serviços iniciais</button>
+    </div>
+    <div class="tabela-wrap">
+      <table>
+        <thead><tr><th>Nome</th><th>Descrição</th><th>Preço base</th><th>Estado</th><th>Ações</th></tr></thead>
+        <tbody id="corpo"><tr><td colspan="5">Carregando…</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from "/js/firebase.js";
+    import { exigirAdmin } from "/js/sessao.js";
+    import { montarCabecalho, montarSubnavAdmin, esc, fmtMoeda, toast } from "/js/ui.js";
+    import { SERVICOS_PADRAO } from "/js/servicos-padrao.js";
+
+    const sessao = await exigirAdmin();
+    montarCabecalho(sessao, "admin");
+    montarSubnavAdmin("servicos");
+
+    const corpo = document.getElementById("corpo");
+    const form = document.getElementById("form-servico");
+    const campo = (id) => document.getElementById(id);
+    const erro = campo("erro");
+    const btnSemear = campo("semear");
+    const btnCancelar = campo("cancelar");
+    let lista = [];
+    let editandoId = null;
+
+    async function carregar() {
+      try {
+        const snap = await getDocs(query(collection(db, "servicos"), orderBy("nome")));
+        lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        desenhar();
+      } catch (e) {
+        console.error(e);
+        corpo.innerHTML = '<tr><td colspan="5">Não foi possível carregar os serviços.</td></tr>';
+      }
+    }
+
+    function desenhar() {
+      btnSemear.hidden = lista.length > 0;
+      corpo.innerHTML = lista.length
+        ? lista.map((s) => `
+            <tr>
+              <td><strong>${esc(s.nome)}</strong></td>
+              <td>${esc(s.descricao)}</td>
+              <td>${fmtMoeda(s.precoBase)}</td>
+              <td><span class="selo selo-${s.ativo ? "ativo" : "inativo"}">${s.ativo ? "Ativo" : "Inativo"}</span></td>
+              <td>
+                <button class="btn btn-claro btn-pequeno" data-acao="editar" data-id="${esc(s.id)}">Editar</button>
+                <button class="btn btn-perigo btn-pequeno" data-acao="excluir" data-id="${esc(s.id)}">Excluir</button>
+              </td>
+            </tr>`).join("")
+        : '<tr><td colspan="5" class="vazio">Nenhum serviço cadastrado. Crie o primeiro no formulário ou carregue os serviços iniciais.</td></tr>';
+    }
+
+    function limparForm() {
+      editandoId = null;
+      form.reset();
+      campo("ativo").checked = true;
+      campo("titulo-form").textContent = "Novo serviço";
+      btnCancelar.hidden = true;
+      erro.hidden = true;
+    }
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      erro.hidden = true;
+      const dados = {
+        nome: campo("nome").value.trim(),
+        descricao: campo("descricao").value.trim(),
+        precoBase: Number(campo("precoBase").value),
+        ativo: campo("ativo").checked
+      };
+      if (!dados.nome || !dados.descricao || !(dados.precoBase >= 0) || campo("precoBase").value === "") {
+        erro.textContent = "Preencha nome, descrição e um preço base válido.";
+        erro.hidden = false;
+        return;
+      }
+      try {
+        if (editandoId) {
+          await updateDoc(doc(db, "servicos", editandoId), dados);
+          toast("Serviço atualizado.");
+        } else {
+          await addDoc(collection(db, "servicos"), { ...dados, criadoEm: serverTimestamp() });
+          toast("Serviço criado.");
+        }
+        limparForm();
+        await carregar();
+      } catch (e) {
+        console.error(e);
+        erro.textContent = "Não foi possível salvar. Confirme se a sua conta tem o papel de admin.";
+        erro.hidden = false;
+      }
+    });
+
+    btnCancelar.addEventListener("click", limparForm);
+
+    corpo.addEventListener("click", async (ev) => {
+      const btn = ev.target.closest("button[data-acao]");
+      if (!btn) return;
+      const s = lista.find((x) => x.id === btn.dataset.id);
+      if (!s) return;
+      if (btn.dataset.acao === "editar") {
+        editandoId = s.id;
+        campo("nome").value = s.nome;
+        campo("descricao").value = s.descricao;
+        campo("precoBase").value = s.precoBase;
+        campo("ativo").checked = !!s.ativo;
+        campo("titulo-form").textContent = "Editar serviço";
+        btnCancelar.hidden = false;
+        campo("nome").focus();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } else if (confirm(`Excluir o serviço “${s.nome}”? Esta ação não pode ser desfeita.`)) {
+        try {
+          await deleteDoc(doc(db, "servicos", s.id));
+          toast("Serviço excluído.");
+          if (editandoId === s.id) limparForm();
+          await carregar();
+        } catch (e) {
+          console.error(e);
+          toast("Não foi possível excluir.", true);
+        }
+      }
+    });
+
+    btnSemear.addEventListener("click", async () => {
+      btnSemear.disabled = true;
+      try {
+        for (const s of SERVICOS_PADRAO) await addDoc(collection(db, "servicos"), { ...s, criadoEm: serverTimestamp() });
+        toast("Serviços iniciais carregados.");
+        await carregar();
+      } catch (e) {
+        console.error(e);
+        toast("Não foi possível carregar os serviços iniciais.", true);
+      } finally {
+        btnSemear.disabled = false;
+      }
+    });
+
+    await carregar();
+  </script>
+</body>
+</html>

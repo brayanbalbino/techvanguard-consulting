@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Criar conta — TechVanguard Consulting</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="auth-wrap">
+    <h1>Criar conta</h1>
+    <p>Com uma conta você consulta os serviços e envia pedidos de orçamento.</p>
+    <div class="msg msg-erro" id="erro" role="alert" hidden></div>
+    <form id="form-registo" novalidate>
+      <div class="campo">
+        <label for="nome">Nome completo</label>
+        <input type="text" id="nome" autocomplete="name" required>
+      </div>
+      <div class="campo">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" autocomplete="email" required>
+      </div>
+      <div class="campo">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" autocomplete="new-password" minlength="8" required>
+        <p class="ajuda">Mínimo de 8 caracteres.</p>
+      </div>
+      <div class="campo">
+        <label for="confirmar">Confirmar senha</label>
+        <input type="password" id="confirmar" autocomplete="new-password" required>
+      </div>
+      <button class="btn btn-rota" type="submit" id="enviar">Criar conta</button>
+    </form>
+    <p style="margin-top:20px">Já tem conta? <a href="/login.html">Entrar</a></p>
+  </main>
+
+  <script type="module">
+    import { auth, db, createUserWithEmailAndPassword, updateProfile, doc, setDoc, serverTimestamp } from "/js/firebase.js";
+    import { registarAcesso } from "/js/sessao.js";
+    import { montarCabecalho, mensagemErroAuth } from "/js/ui.js";
+
+    montarCabecalho({ user: null, perfil: null });
+
+    const erro = document.getElementById("erro");
+    const botao = document.getElementById("enviar");
+    const mostrarErro = (texto) => { erro.textContent = texto; erro.hidden = false; };
+
+    document.getElementById("form-registo").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      erro.hidden = true;
+      const nome = document.getElementById("nome").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+      const confirmar = document.getElementById("confirmar").value;
+
+      if (nome.length < 3) return mostrarErro("Digite o seu nome completo.");
+      if (!email) return mostrarErro("Digite o seu e-mail.");
+      if (senha.length < 8) return mostrarErro("A senha precisa ter pelo menos 8 caracteres.");
+      if (senha !== confirmar) return mostrarErro("As senhas não coincidem.");
+
+      botao.disabled = true;
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, senha);
+        await updateProfile(cred.user, { displayName: nome });
+        // O papel é sempre "cliente"; as regras do Firestore recusam qualquer outro valor.
+        await setDoc(doc(db, "usuarios", cred.user.uid), {
+          nome,
+          email: cred.user.email,
+          papel: "cliente",
+          criadoEm: serverTimestamp()
+        });
+        try { await registarAcesso(cred.user, "registo"); } catch (e) { console.warn(e); }
+        location.href = "/cliente/servicos.html";
+      } catch (e) {
+        mostrarErro(mensagemErroAuth(e.code));
+        botao.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

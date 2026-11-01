@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Serviços — TechVanguard Consulting</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="site-header" id="cabecalho"></header>
+  <main class="wrap pagina">
+    <h1>Serviços disponíveis</h1>
+    <p class="intro">Escolha o serviço que precisa e peça um orçamento. Os valores são a partir de, e o preço final depende do escopo.</p>
+    <ul class="lista-servicos" id="lista-servicos"><li>Carregando serviços…</li></ul>
+  </main>
+
+  <script type="module">
+    import { db, collection, getDocs, query, where } from "/js/firebase.js";
+    import { exigirLogin } from "/js/sessao.js";
+    import { montarCabecalho, esc, fmtMoeda } from "/js/ui.js";
+
+    const sessao = await exigirLogin();
+    montarCabecalho(sessao, "servicos");
+
+    const lista = document.getElementById("lista-servicos");
+    try {
+      const snap = await getDocs(query(collection(db, "servicos"), where("ativo", "==", true)));
+      const servicos = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+
+      lista.innerHTML = servicos.length
+        ? servicos.map((s) => `
+            <li>
+              <div><h3>${esc(s.nome)}</h3><p>${esc(s.descricao)}</p></div>
+              <p class="preco">a partir de <strong>${fmtMoeda(s.precoBase)}</strong>
+                <a class="btn btn-rota btn-pequeno" href="/cliente/pedidos.html?servico=${encodeURIComponent(s.id)}">Pedir orçamento</a></p>
+            </li>`).join("")
+        : "<li>Nenhum serviço disponível no momento.</li>";
+    } catch (e) {
+      console.error(e);
+      lista.innerHTML = "<li>Não foi possível carregar os serviços. Atualize a página.</li>";
+    }
+  </script>
+</body>
+</html>
