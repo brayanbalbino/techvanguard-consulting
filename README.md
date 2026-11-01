@@ -5,6 +5,7 @@
 Aplicação web de uma empresa fictícia de consultoria em Tecnologias de Informação, desenvolvida como atividade prática em dupla (BD - Bezerra). Integra front-end, autenticação, base de dados e controlo de acesso.
 
 **Aplicação publicada:** _https://techvanguard-consulting.vercel.app/_
+**Video Teste da Aplicação:** _https://youtu.be/XK5qIeaL5y0_
 
 ## Funcionalidades
 
