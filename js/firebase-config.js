@@ -4,10 +4,10 @@
 // são as regras do Firestore (firestore.rules) e o Firebase Authentication.
 // Nunca coloque aqui chaves de "conta de serviço" (service account).
 export const firebaseConfig = {
-  apiKey: "COLE_AQUI_A_API_KEY",
-  authDomain: "SEU-PROJETO.firebaseapp.com",
-  projectId: "SEU-PROJETO",
-  storageBucket: "SEU-PROJETO.appspot.com",
-  messagingSenderId: "COLE_AQUI",
-  appId: "COLE_AQUI"
+  apiKey: "AIzaSyCmsUw5tvJ3jgaD5lcYUsiCul3UlqWonKQ",
+  authDomain: "techvanguard-consulting-bfb71.firebaseapp.com",
+  projectId: "techvanguard-consulting-bfb71",
+  storageBucket: "techvanguard-consulting-bfb71.firebasestorage.app",
+  messagingSenderId: "745557954243",
+  appId: "1:745557954243:web:c69a13d96c2384ffb49c76"
 };
